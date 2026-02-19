@@ -25,6 +25,9 @@ func main() {
 	}
 
 	db, err := sql.Open("pgx", cnf.DBAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer db.Close()
 
 	rep := repository.NewRepository(db)

@@ -67,10 +67,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, services.ErrorInvalidCredentials) {
 			http.Error(w, "User authorization failed", http.StatusUnauthorized)
-			return
 		} else if err != nil {
 			http.Error(w, "Failed to register the user", http.StatusInternalServerError)
-			return
 		}
 	}
 

@@ -50,7 +50,6 @@ func (h *OrderHandler) SetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-	return
 }
 
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {

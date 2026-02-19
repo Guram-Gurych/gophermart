@@ -7,7 +7,7 @@ import (
 )
 
 type Repository interface {
-	CreateUser(ctx context.Context, UserId uuid.UUID, login, hashPassword string) error
+	CreateUser(ctx context.Context, userID uuid.UUID, login, hashPassword string) error
 	GetUserByLogin(ctx context.Context, login string) (models.Users, error)
 	SaveOrder(ctx context.Context, userID uuid.UUID, orderNumber string) error
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]models.Order, error)
