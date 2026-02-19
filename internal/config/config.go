@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 )
 
@@ -12,13 +13,20 @@ type Config struct {
 	SecretKey      string
 }
 
-func InitConfig() *Config {
+const (
+	defaultServerAddress  = "localhost:8080"
+	defaultDBAddress      = ""
+	defaultAccrualAddress = ""
+	defaultSecretKey      = "secretKey"
+)
+
+func InitConfig() (*Config, error) {
 	var config Config
 
-	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&config.DBAddress, "d", "", "database connection address")
-	flag.StringVar(&config.AccrualAddress, "r", "", "address of the accrual calculation system")
-	flag.StringVar(&config.SecretKey, "k", "secretKey", "key for hashing the data")
+	flag.StringVar(&config.ServerAddress, "a", defaultServerAddress, "address and port to run server")
+	flag.StringVar(&config.DBAddress, "d", defaultDBAddress, "database connection address")
+	flag.StringVar(&config.AccrualAddress, "r", defaultAccrualAddress, "address of the accrual calculation system")
+	flag.StringVar(&config.SecretKey, "k", defaultSecretKey, "key for hashing the data")
 
 	flag.Parse()
 
@@ -35,5 +43,11 @@ func InitConfig() *Config {
 		config.SecretKey = envSecretKey
 	}
 
-	return &config
+	if config.DBAddress == "" {
+		return nil, fmt.Errorf("the database address is not specified")
+	} else if config.AccrualAddress == "" {
+		return nil, fmt.Errorf("the address accrual calculation system is not specified")
+	}
+
+	return &config, nil
 }

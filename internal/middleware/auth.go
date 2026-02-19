@@ -1,0 +1,45 @@
+package middleware
+
+import (
+	"context"
+	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+	"net/http"
+)
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
+func GetUserID(ctx context.Context) (uuid.UUID, bool) {
+	userID, ok := ctx.Value(userIDKey).(uuid.UUID)
+	return userID, ok
+}
+
+func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("auth_token")
+			if err != nil {
+				http.Error(w, "User authorization failed", http.StatusUnauthorized)
+				return
+			}
+
+			claims := &services.TokenClaims{}
+
+			token, err := jwt.ParseWithClaims(cookie.Value, claims, func(t *jwt.Token) (interface{}, error) {
+				return []byte(secretKey), nil
+			})
+
+			if err != nil || !token.Valid {
+				http.Error(w, "User authorization failed", http.StatusUnauthorized)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}

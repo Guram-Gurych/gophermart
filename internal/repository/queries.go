@@ -16,17 +16,19 @@ const (
 	queryInsertOrder = `
 		INSERT INTO orders (number, user_id)
 		VALUES ($1, $2)
+		ON CONFLICT (number) DO UPDATE SET number = EXCLUDED.number
+		RETURNING user_id, (xmax = 0) AS is_inserted;
 	`
-	querySelectOrder = `
-		SELECT user_id
-		FROM orders
-		WHERE number = $1
+	queryUpdateOrderStatusandAccrual = `
+		UPDATE orders
+		SET status = $1, accrual = $2
+		WHERE number = $3 AND status NOT IN ('PROCESSED', 'INVALID')
+		RETURNING user_id;
 	`
 	queryUpdateOrderStatus = `
-		UPDATE orders
-		SET status = $1, accrual $2
-		WHERE number = $3 AND status NOT IN ('PROCESSED', 'INVALID')
-		RETURNING user_id
+		UPDATE orders 
+		SET status = $1 
+		WHERE number = ANY($2) AND status IN ('NEW', 'REGISTERED', 'PROCESSING')
 	`
 	queryUpdateBalance = `
 		UPDATE balances
@@ -44,8 +46,8 @@ const (
 		WHERE user_id = $2 AND current >= $1
 	`
 	queryInsertWithdrawal = `
-		INSERT INTO withdrawal (user_id, order_number, sum)
-		VALUES ($1, $2, $3)
+		INSERT INTO withdrawal (id, user_id, order_number, sum)
+		VALUES ($1, $2, $3, $4)
 	`
 	querySelectWithdrawalsByUser = `
 		SELECT order_number, sum, processed_at
@@ -55,6 +57,6 @@ const (
 	`
 	querySelectOrdersBase = `
 		SELECT number, status, uploaded_at
-		FROM orders WHERE 
+		FROM orders 
 	`
 )
