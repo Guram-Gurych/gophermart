@@ -120,17 +120,15 @@ func (w *Worker) processOrder(ctx context.Context, number string) {
 			log.Printf("Error when deserializing order %s in JSON: %v", number, err)
 			return
 		}
+		
+		var balance models.JSONBalance
+		if acrrual.Accrual != nil {
+			balance = *acrrual.Accrual
+		}
 
-		if acrrual.Status == models.StatusProcessed || acrrual.Status == models.StatusInvalid {
-			var balance models.JSONBalance
-			if acrrual.Accrual != nil {
-				balance = *acrrual.Accrual
-			}
-
-			if err = w.repository.UpdateOrder(ctx, acrrual.Order, acrrual.Status, balance); err != nil {
-				log.Printf("Error when updating the order status %s: %v", number, err)
-				return
-			}
+		if err = w.repository.UpdateOrder(ctx, acrrual.Order, acrrual.Status, balance); err != nil {
+			log.Printf("Error when updating the order status %s: %v", number, err)
+			return
 		}
 	case http.StatusNoContent:
 		return

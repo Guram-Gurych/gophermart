@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS orders (
     accrual BIGINT DEFAULT 0,
     uploaded_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES Users(id),
-    CONSTRAINT check_status CHECK (status IN ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED'))
+    CONSTRAINT check_status CHECK (status IN ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED', 'REGISTERED'))
 );
 
 CREATE TABLE IF NOT EXISTS withdrawal (
