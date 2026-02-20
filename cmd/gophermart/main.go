@@ -8,6 +8,7 @@ import (
 	"github.com/Guram-Gurych/gophermart.git/internal/middleware"
 	"github.com/Guram-Gurych/gophermart.git/internal/repository"
 	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/Guram-Gurych/gophermart.git/migrations"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"log"
@@ -29,6 +30,16 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	if err = db.Ping(); err != nil {
+		log.Fatalf("failed to ping database: %v", err)
+	}
+
+	initCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := migrations.RunMigrations(initCtx, db); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
 	rep := repository.NewRepository(db)
 
@@ -66,6 +77,8 @@ func main() {
 		Addr:    cnf.ServerAddress,
 		Handler: r,
 	}
+
+	log.Println("Server started")
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

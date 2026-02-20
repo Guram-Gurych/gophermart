@@ -1,11 +1,10 @@
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     login varchar(255) UNIQUE NOT NULL,
     password_hash varchar(255)
 );
 
-CREATE TABLE orders
-(
+CREATE TABLE IF NOT EXISTS orders (
     number VARCHAR(255) PRIMARY KEY,
     user_id UUID NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'NEW',
@@ -15,8 +14,7 @@ CREATE TABLE orders
     CONSTRAINT check_status CHECK (status IN ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED'))
 );
 
-CREATE TABLE withdrawal
-(
+CREATE TABLE IF NOT EXISTS withdrawal (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     order_number VARCHAR(255) UNIQUE NOT NULL,
@@ -25,8 +23,7 @@ CREATE TABLE withdrawal
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES Users (id)
 );
 
-CREATE TABLE balances
-(
+CREATE TABLE IF NOT EXISTS balances (
     user_id UUID PRIMARY KEY REFERENCES users(id),
     current BIGINT NOT NULL DEFAULT 0,
     withdrawn BIGINT NOT NULL DEFAULT 0
