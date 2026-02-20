@@ -32,11 +32,11 @@ func (h *BalanceHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err = json.NewEncoder(w).Encode(balance); err != nil {
 		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *BalanceHandler) SetWithdraw(w http.ResponseWriter, r *http.Request) {

@@ -5,7 +5,7 @@ import (
 )
 
 func (rep *DBRepository) GetPendingOrders(ctx context.Context, limit int) ([]string, error) {
-	listOrder, err := rep.fetchOrders(ctx, "WHERE status = 'REGISTERED' ORDER BY uploaded_at ASC LIMIT $1", limit)
+	listOrder, err := rep.fetchOrders(ctx, "WHERE status = 'NEW' ORDER BY uploaded_at ASC LIMIT $1", limit)
 	if err != nil {
 		return nil, err
 	}
