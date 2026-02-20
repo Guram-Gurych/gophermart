@@ -73,7 +73,7 @@ func (rep *DBRepository) fetchOrders(ctx context.Context, condition string, args
 	var orders []models.Order
 	for rows.Next() {
 		var order models.Order
-		if err = rows.Scan(&order.Number, &order.Status, &order.UploadedAt); err != nil {
+		if err = rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrorDataScan, err)
 		}
 		orders = append(orders, order)

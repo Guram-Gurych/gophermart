@@ -56,7 +56,7 @@ const (
 		ORDER BY processed_at DESC
 	`
 	querySelectOrdersBase = `
-		SELECT number, status, uploaded_at
+		SELECT number, status, accrual, uploaded_at
 		FROM orders 
 	`
 )
