@@ -67,14 +67,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, services.ErrorInvalidCredentials) {
 			http.Error(w, "User authorization failed", http.StatusUnauthorized)
-		} else if err != nil {
+			return
+		} else {
 			http.Error(w, "Failed to register the user", http.StatusInternalServerError)
+			return
 		}
 	}
 
 	h.setAuthCookie(w, token)
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *AuthHandler) setAuthCookie(w http.ResponseWriter, token string) {
