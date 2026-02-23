@@ -3,15 +3,14 @@ package services
 import (
 	"context"
 	"github.com/Guram-Gurych/gophermart.git/internal/models"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
 	"github.com/google/uuid"
 )
 
 type OrderService struct {
-	repository repository.Repository
+	repository OrderRepository
 }
 
-func NewOrderService(rep repository.Repository) *OrderService {
+func NewOrderService(rep OrderRepository) *OrderService {
 	return &OrderService{
 		repository: rep,
 	}

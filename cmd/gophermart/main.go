@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,6 +26,20 @@ func main() {
 		log.Fatalf("error when initializing the config: %v", err)
 	}
 
+	opts := &slog.HandlerOptions{
+		Level: config.ParseLogLevel(cnf.LogLevel),
+	}
+
+	baseHandler := slog.NewJSONHandler(os.Stdout, opts)
+	finalHandler := &middleware.ReqIDHandler{Handler: baseHandler}
+
+	logger := slog.New(finalHandler)
+	slog.SetDefault(logger)
+
+	logger.Info("server is starting",
+		slog.String("address", cnf.ServerAddress),
+		slog.String("db", cnf.DBAddress))
+
 	db, err := sql.Open("pgx", cnf.DBAddress)
 	if err != nil {
 		log.Fatal(err)
@@ -32,22 +47,30 @@ func main() {
 	defer db.Close()
 
 	if err = db.Ping(); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
+		logger.Error("starting the database returned an error", slog.Any("error", err))
 	}
 
 	initCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := migrations.RunMigrations(initCtx, db); err != nil {
-		log.Fatalf("failed to run migrations: %v", err)
+	if err = migrations.RunMigrations(initCtx, db, logger); err != nil {
+		logger.Error("failed to run migrations", slog.Any("error", err))
 	}
 
 	rep := repository.NewRepository(db)
 
-	authHandler := handlers.NewAuthHandler(services.NewAuthService(rep, cnf.SecretKey))
-	orderHandler := handlers.NewOrderHandler(services.NewOrderService(rep))
-	balanceHandler := handlers.NewBalanceHandler(services.NewBalanceService(rep))
+	var authService services.AuthRepository = rep
+	var orderService services.OrderRepository = rep
+	var balanceService services.BalanceRepository = rep
+
+	authHandler := handlers.NewAuthHandler(services.NewAuthService(authService, cnf.SecretKey), logger)
+	orderHandler := handlers.NewOrderHandler(services.NewOrderService(orderService), logger)
+	balanceHandler := handlers.NewBalanceHandler(services.NewBalanceService(balanceService), logger)
 
 	r := chi.NewRouter()
+
+	r.Use(middleware.RequestMiddleware())
+	r.Use(middleware.LoggerMiddleware(logger))
+
 	r.Post("/api/user/register", authHandler.Register)
 	r.Post("/api/user/login", authHandler.Login)
 
@@ -61,7 +84,7 @@ func main() {
 	})
 
 	client := http.Client{Timeout: 10 * time.Second}
-	worker := services.NewWorker(rep, &client, cnf.AccrualAddress)
+	worker := services.NewWorker(rep, &client, logger, cnf.AccrualAddress)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -78,11 +101,11 @@ func main() {
 		Handler: r,
 	}
 
-	log.Println("Server started")
+	logger.Info("Server started")
 
 	go func() {
 		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+			logger.Error("Error when starting the server", slog.Any("error", err))
 		}
 	}()
 
@@ -91,9 +114,9 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err = srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Error("Server forced to shutdown", slog.Any("error", err))
 	}
 
 	worker.Wait()
-	log.Println("All workers stopped")
+	logger.Info("All workers stopped")
 }

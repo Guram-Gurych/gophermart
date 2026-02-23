@@ -59,7 +59,7 @@ func (rep *DBRepository) GetWithdrawalsByUserID(ctx context.Context, userID uuid
 	var withdrawals []models.Withdrawal
 	for rows.Next() {
 		var withdrawal models.Withdrawal
-		if err := rows.Scan(&withdrawal.OrderNumber, &withdrawal.Sum, &withdrawal.ProcessedAt); err != nil {
+		if err = rows.Scan(&withdrawal.OrderNumber, &withdrawal.Sum, &withdrawal.ProcessedAt); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrorDataScan, err)
 		}
 		withdrawals = append(withdrawals, withdrawal)

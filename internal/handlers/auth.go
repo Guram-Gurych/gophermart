@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/Guram-Gurych/gophermart.git/internal/repository"
 	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"log/slog"
 	"net/http"
 )
 
@@ -15,10 +16,11 @@ type userRequest struct {
 
 type AuthHandler struct {
 	service *services.AuthService
+	Logger  *slog.Logger
 }
 
-func NewAuthHandler(serv *services.AuthService) *AuthHandler {
-	return &AuthHandler{service: serv}
+func NewAuthHandler(serv *services.AuthService, log *slog.Logger) *AuthHandler {
+	return &AuthHandler{service: serv, Logger: log}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -37,9 +39,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	token, err := h.service.Register(r.Context(), user.Login, user.Password)
 	if err != nil {
 		if errors.Is(err, repository.ErrorUserAlreadyExists) {
+			h.Logger.InfoContext(r.Context(), "registration failed: user already exists", slog.String("login", user.Login))
 			http.Error(w, "Failed to register the user", http.StatusConflict)
 			return
 		} else {
+			h.Logger.ErrorContext(r.Context(), "internal error during registration",
+				slog.String("login", user.Login),
+				slog.Any("error", err))
 			http.Error(w, "Failed to register the user", http.StatusInternalServerError)
 			return
 		}
@@ -66,9 +72,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := h.service.Login(r.Context(), user.Login, user.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrorInvalidCredentials) {
+			h.Logger.WarnContext(r.Context(), "auth failed: invalid credentials", slog.String("login", user.Login))
 			http.Error(w, "User authorization failed", http.StatusUnauthorized)
 			return
 		} else {
+			h.Logger.ErrorContext(r.Context(), "login service internal error",
+				slog.String("login", user.Login),
+				slog.Any("error", err))
 			http.Error(w, "Failed to register the user", http.StatusInternalServerError)
 			return
 		}

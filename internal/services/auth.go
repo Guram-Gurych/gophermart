@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -15,11 +14,11 @@ type TokenClaims struct {
 }
 
 type AuthService struct {
-	repository repository.Repository
+	repository AuthRepository
 	secretKey  string
 }
 
-func NewAuthService(repo repository.Repository, key string) *AuthService {
+func NewAuthService(repo AuthRepository, key string) *AuthService {
 	return &AuthService{
 		repository: repo,
 		secretKey:  key,

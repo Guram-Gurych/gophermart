@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 )
 
 func (rep *DBRepository) GetPendingOrders(ctx context.Context, limit int) ([]string, error) {

@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Guram-Gurych/gophermart.git/internal/models"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"sync"
@@ -20,21 +19,23 @@ type AccrualResponse struct {
 }
 
 type Worker struct {
-	repository  repository.Repository
+	repository  WorkerRepository
 	client      *http.Client
+	logger      *slog.Logger
 	address     string
 	taskChan    chan string
 	stopTimeout chan time.Duration
 	wg          sync.WaitGroup
 }
 
-func NewWorker(rep repository.Repository, client *http.Client, addr string) *Worker {
+func NewWorker(rep WorkerRepository, client *http.Client, logger *slog.Logger, addr string) *Worker {
 	task := make(chan string)
 	stop := make(chan time.Duration)
 
 	return &Worker{
 		repository:  rep,
 		client:      client,
+		logger:      logger,
 		address:     addr,
 		taskChan:    task,
 		stopTimeout: stop,
@@ -42,11 +43,14 @@ func NewWorker(rep repository.Repository, client *http.Client, addr string) *Wor
 }
 
 func (w *Worker) StartScheduler(ctx context.Context) {
+	w.logger.Info("scheduler started")
 	for {
 		select {
 		case <-ctx.Done():
+			w.logger.Info("scheduler stopping")
 			return
 		case timeout := <-w.stopTimeout:
+			w.logger.Info("scheduler timeout")
 			pauseTimer := time.NewTimer(timeout)
 			select {
 			case <-pauseTimer.C:
@@ -57,11 +61,12 @@ func (w *Worker) StartScheduler(ctx context.Context) {
 		default:
 			tasks, err := w.repository.GetPendingOrders(ctx, 10)
 			if err != nil {
-				log.Printf("Error when receiving orders from the database: %v", err)
+				w.logger.Error("Error when receiving orders from the database", slog.Any("error", err))
 				continue
 			}
 
 			if len(tasks) == 0 {
+				w.logger.Debug("no pending orders found, sleeping")
 				pauseTimer := time.NewTimer(time.Second * 5)
 				select {
 				case <-pauseTimer.C:
@@ -72,10 +77,11 @@ func (w *Worker) StartScheduler(ctx context.Context) {
 			}
 
 			if err = w.repository.UpdateOrdersStatus(ctx, tasks, models.StatusProcessing); err != nil {
-				log.Printf("Error when changing orders statuses in the database: %v", err)
+				w.logger.Error("Error when changing orders statuses in the database", slog.Any("error", err))
 				continue
 			}
 
+			w.logger.Info("found orders for processing", slog.Int("count", len(tasks)))
 			for _, task := range tasks {
 				select {
 				case w.taskChan <- task:
@@ -108,7 +114,7 @@ func (w *Worker) StartWorker(ctx context.Context) {
 func (w *Worker) processOrder(ctx context.Context, number string) {
 	resp, err := w.client.Get(fmt.Sprintf("%s/api/orders/%s", w.address, number))
 	if err != nil {
-		log.Printf("error when executing an order request %s: %v", number, err)
+		w.logger.Error("error when executing an order request", slog.String("number", number), slog.Any("error", err))
 		return
 	}
 	defer resp.Body.Close()
@@ -117,17 +123,17 @@ func (w *Worker) processOrder(ctx context.Context, number string) {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		if err = json.NewDecoder(resp.Body).Decode(&acrrual); err != nil {
-			log.Printf("Error when deserializing order %s in JSON: %v", number, err)
+			w.logger.Error("Error when deserializing order in JSON", slog.String("number", number), slog.Any("error", err))
 			return
 		}
-		
+
 		var balance models.JSONBalance
 		if acrrual.Accrual != nil {
 			balance = *acrrual.Accrual
 		}
 
 		if err = w.repository.UpdateOrder(ctx, acrrual.Order, acrrual.Status, balance); err != nil {
-			log.Printf("Error when updating the order status %s: %v", number, err)
+			w.logger.Error("Error when updating the order status", slog.String("number", number), slog.Any("error", err))
 			return
 		}
 	case http.StatusNoContent:
@@ -135,7 +141,7 @@ func (w *Worker) processOrder(ctx context.Context, number string) {
 	case http.StatusTooManyRequests:
 		timeout, err := strconv.Atoi(resp.Header.Get("Retry-After"))
 		if err != nil {
-			log.Printf("error when converting timeout to a number: %v", err)
+			w.logger.Error("Error when converting timeout to a number", slog.Any("error", err))
 			return
 		}
 

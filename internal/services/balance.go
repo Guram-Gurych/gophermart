@@ -3,15 +3,14 @@ package services
 import (
 	"context"
 	"github.com/Guram-Gurych/gophermart.git/internal/models"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
 	"github.com/google/uuid"
 )
 
 type BalanceService struct {
-	repository repository.Repository
+	repository BalanceRepository
 }
 
-func NewBalanceService(rep repository.Repository) *BalanceService {
+func NewBalanceService(rep BalanceRepository) *BalanceService {
 	return &BalanceService{repository: rep}
 }
 

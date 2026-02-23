@@ -8,12 +8,8 @@ import (
 	"net/http"
 )
 
-type contextKey string
-
-const userIDKey contextKey = "userID"
-
 func GetUserID(ctx context.Context) (uuid.UUID, bool) {
-	userID, ok := ctx.Value(userIDKey).(uuid.UUID)
+	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
 	return userID, ok
 }
 
@@ -37,7 +33,7 @@ func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
