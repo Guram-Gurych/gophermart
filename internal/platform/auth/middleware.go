@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/Guram-Gurych/gophermart.git/internal/domain"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	"net/http"
 )
 
