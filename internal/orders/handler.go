@@ -1,27 +1,32 @@
-package handlers
+package orders
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Guram-Gurych/gophermart.git/internal/middleware"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
-	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
+	"github.com/google/uuid"
 	"io"
 	"log/slog"
 	"net/http"
 )
 
-type OrderHandler struct {
-	service *services.OrderService
+type OrderService interface {
+	SaveOrder(ctx context.Context, userID uuid.UUID, orderNumber string) error
+	GetOrders(ctx context.Context, userID uuid.UUID) ([]domain.Order, error)
+}
+
+type orderHandler struct {
+	service OrderService
 	Logger  *slog.Logger
 }
 
-func NewOrderHandler(serv *services.OrderService, log *slog.Logger) *OrderHandler {
-	return &OrderHandler{service: serv, Logger: log}
+func NewOrderHandler(serv OrderService, log *slog.Logger) *orderHandler {
+	return &orderHandler{service: serv, Logger: log}
 }
 
-func (h *OrderHandler) SetOrder(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+func (h *orderHandler) SetOrder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := domain.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "User unauthorized", http.StatusUnauthorized)
 		return
@@ -39,13 +44,13 @@ func (h *OrderHandler) SetOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.SaveOrder(r.Context(), userID, orderNumber)
 	if err != nil {
-		if errors.Is(err, services.ErrorInvalidOrderNumber) {
+		if errors.Is(err, domain.ErrorInvalidOrderNumber) {
 			http.Error(w, "Failed to decode request body", http.StatusUnprocessableEntity)
 			return
-		} else if errors.Is(err, repository.ErrorOrderAlreadyExists) {
+		} else if errors.Is(err, domain.ErrorOrderAlreadyExists) {
 			w.WriteHeader(http.StatusOK)
 			return
-		} else if errors.Is(err, repository.ErrorOrderConflict) {
+		} else if errors.Is(err, domain.ErrorOrderConflict) {
 			h.Logger.WarnContext(r.Context(), "order conflict: already uploaded by another user",
 				slog.String("number", orderNumber),
 				slog.String("user_id", userID.String()))
@@ -63,8 +68,8 @@ func (h *OrderHandler) SetOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+func (h *orderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	userID, ok := domain.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "User unauthorized", http.StatusUnauthorized)
 		return

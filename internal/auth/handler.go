@@ -1,29 +1,34 @@
-package handlers
+package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
-	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
 	"log/slog"
 	"net/http"
 )
+
+type AuthService interface {
+	Register(ctx context.Context, login, password string) (string, error)
+	Login(ctx context.Context, login, password string) (string, error)
+}
 
 type userRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
-type AuthHandler struct {
-	service *services.AuthService
+type authHandler struct {
+	service AuthService
 	Logger  *slog.Logger
 }
 
-func NewAuthHandler(serv *services.AuthService, log *slog.Logger) *AuthHandler {
-	return &AuthHandler{service: serv, Logger: log}
+func NewAuthHandler(serv AuthService, log *slog.Logger) *authHandler {
+	return &authHandler{service: serv, Logger: log}
 }
 
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var user userRequest
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
@@ -38,7 +43,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.service.Register(r.Context(), user.Login, user.Password)
 	if err != nil {
-		if errors.Is(err, repository.ErrorUserAlreadyExists) {
+		if errors.Is(err, domain.ErrorUserAlreadyExists) {
 			h.Logger.InfoContext(r.Context(), "registration failed: user already exists", slog.String("login", user.Login))
 			http.Error(w, "Failed to register the user", http.StatusConflict)
 			return
@@ -56,7 +61,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var user userRequest
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
@@ -71,7 +76,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.service.Login(r.Context(), user.Login, user.Password)
 	if err != nil {
-		if errors.Is(err, services.ErrorInvalidCredentials) {
+		if errors.Is(err, domain.ErrorInvalidCredentials) {
 			h.Logger.WarnContext(r.Context(), "auth failed: invalid credentials", slog.String("login", user.Login))
 			http.Error(w, "User authorization failed", http.StatusUnauthorized)
 			return
@@ -89,7 +94,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *AuthHandler) setAuthCookie(w http.ResponseWriter, token string) {
+func (h *authHandler) setAuthCookie(w http.ResponseWriter, token string) {
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,

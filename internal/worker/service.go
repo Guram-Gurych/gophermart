@@ -1,10 +1,10 @@
-package services
+package worker
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Guram-Gurych/gophermart.git/internal/models"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -12,10 +12,16 @@ import (
 	"time"
 )
 
+type WorkerRepository interface {
+	GetPendingOrders(ctx context.Context, limit int) ([]string, error)
+	UpdateOrder(ctx context.Context, orderNumber string, status domain.OrderStatus, accrual domain.JSONBalance) error
+	UpdateOrdersStatus(ctx context.Context, numbers []string, status domain.OrderStatus) error
+}
+
 type AccrualResponse struct {
 	Order   string              `json:"order"`
-	Status  models.OrderStatus  `json:"status"`
-	Accrual *models.JSONBalance `json:"accrual,omitempty"`
+	Status  domain.OrderStatus  `json:"status"`
+	Accrual *domain.JSONBalance `json:"accrual,omitempty"`
 }
 
 type Worker struct {
@@ -76,7 +82,7 @@ func (w *Worker) StartScheduler(ctx context.Context) {
 				}
 			}
 
-			if err = w.repository.UpdateOrdersStatus(ctx, tasks, models.StatusProcessing); err != nil {
+			if err = w.repository.UpdateOrdersStatus(ctx, tasks, domain.StatusProcessing); err != nil {
 				w.logger.Error("Error when changing orders statuses in the database", slog.Any("error", err))
 				continue
 			}
@@ -112,7 +118,14 @@ func (w *Worker) StartWorker(ctx context.Context) {
 }
 
 func (w *Worker) processOrder(ctx context.Context, number string) {
-	resp, err := w.client.Get(fmt.Sprintf("%s/api/orders/%s", w.address, number))
+	url := fmt.Sprintf("%s/api/orders/%s", w.address, number)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		w.logger.Error("error when creating the request", slog.String("number", number), slog.Any("error", err))
+		return
+	}
+
+	resp, err := w.client.Do(req)
 	if err != nil {
 		w.logger.Error("error when executing an order request", slog.String("number", number), slog.Any("error", err))
 		return
@@ -127,7 +140,7 @@ func (w *Worker) processOrder(ctx context.Context, number string) {
 			return
 		}
 
-		var balance models.JSONBalance
+		var balance domain.JSONBalance
 		if acrrual.Accrual != nil {
 			balance = *acrrual.Accrual
 		}
@@ -154,7 +167,7 @@ func (w *Worker) processOrder(ctx context.Context, number string) {
 			select {
 			case w.taskChan <- number:
 			default:
-				w.repository.UpdateOrdersStatus(ctx, []string{number}, models.StatusREGISTERED)
+				w.repository.UpdateOrdersStatus(ctx, []string{number}, domain.StatusREGISTERED)
 			}
 		case <-ctx.Done():
 			return

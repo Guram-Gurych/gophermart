@@ -1,4 +1,4 @@
-package repository
+package domain
 
 import "errors"
 
@@ -14,4 +14,9 @@ var (
 	ErrorRowsIteration      = errors.New("error during rows iteration")
 	ErrorTransactionStart   = errors.New("error when starting a transaction")
 	ErrorInsufficientFunds  = errors.New("there are insufficient funds in the account")
+)
+
+var (
+	ErrorInvalidCredentials = errors.New("error passwords didn't match")
+	ErrorInvalidOrderNumber = errors.New("error the number is incorrect")
 )

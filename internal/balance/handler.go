@@ -1,27 +1,32 @@
-package handlers
+package balance
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Guram-Gurych/gophermart.git/internal/middleware"
-	"github.com/Guram-Gurych/gophermart.git/internal/models"
-	"github.com/Guram-Gurych/gophermart.git/internal/repository"
-	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
+	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 )
 
-type BalanceHandler struct {
-	service *services.BalanceService
+type BalanceService interface {
+	GetBalance(ctx context.Context, userID uuid.UUID) (domain.Balance, error)
+	Withdraw(ctx context.Context, userID uuid.UUID, w domain.Withdrawal) error
+	GetWithdrawals(ctx context.Context, userID uuid.UUID) ([]domain.Withdrawal, error)
+}
+
+type balanceHandler struct {
+	service BalanceService
 	Logger  *slog.Logger
 }
 
-func NewBalanceHandler(serv *services.BalanceService, log *slog.Logger) *BalanceHandler {
-	return &BalanceHandler{service: serv, Logger: log}
+func NewBalanceHandler(serv BalanceService, log *slog.Logger) *balanceHandler {
+	return &balanceHandler{service: serv, Logger: log}
 }
 
-func (h *BalanceHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+func (h *balanceHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := domain.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "User unauthorized", http.StatusUnauthorized)
 		return
@@ -45,14 +50,14 @@ func (h *BalanceHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *BalanceHandler) SetWithdraw(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+func (h *balanceHandler) SetWithdraw(w http.ResponseWriter, r *http.Request) {
+	userID, ok := domain.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "User unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	var withdrawal models.Withdrawal
+	var withdrawal domain.Withdrawal
 	if err := json.NewDecoder(r.Body).Decode(&withdrawal); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
@@ -61,10 +66,10 @@ func (h *BalanceHandler) SetWithdraw(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.Withdraw(r.Context(), userID, withdrawal)
 	if err != nil {
-		if errors.Is(err, services.ErrorInvalidOrderNumber) {
+		if errors.Is(err, domain.ErrorInvalidOrderNumber) {
 			http.Error(w, "Invalid order number format", http.StatusUnprocessableEntity)
 			return
-		} else if errors.Is(err, repository.ErrorInsufficientFunds) {
+		} else if errors.Is(err, domain.ErrorInsufficientFunds) {
 			http.Error(w, "There are insufficient funds in the account", http.StatusPaymentRequired)
 			return
 		} else {
@@ -79,8 +84,8 @@ func (h *BalanceHandler) SetWithdraw(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *BalanceHandler) GetWithdraws(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+func (h *balanceHandler) GetWithdraws(w http.ResponseWriter, r *http.Request) {
+	userID, ok := domain.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "User unauthorized", http.StatusUnauthorized)
 		return

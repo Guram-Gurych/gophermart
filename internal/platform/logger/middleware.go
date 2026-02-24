@@ -1,7 +1,8 @@
-package middleware
+package logger
 
 import (
 	"context"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
 	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
@@ -36,7 +37,7 @@ type ReqIDHandler struct {
 }
 
 func (h *ReqIDHandler) Handle(ctx context.Context, r slog.Record) error {
-	if id, ok := ctx.Value(RequestIDKey).(string); ok {
+	if id, ok := ctx.Value(domain.RequestIDKey).(string); ok {
 		r.AddAttrs(slog.String("request_id", id))
 	}
 	return h.Handler.Handle(ctx, r)
@@ -71,7 +72,7 @@ func RequestMiddleware() func(http.Handler) http.Handler {
 			id := uuid.New().String()
 			w.Header().Set("X-Request-ID", id)
 
-			ctx := context.WithValue(r.Context(), RequestIDKey, id)
+			ctx := context.WithValue(r.Context(), domain.RequestIDKey, id)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

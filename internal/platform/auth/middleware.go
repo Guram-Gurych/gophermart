@@ -2,16 +2,11 @@ package middleware
 
 import (
 	"context"
-	"github.com/Guram-Gurych/gophermart.git/internal/services"
+	"github.com/Guram-Gurych/gophermart.git/internal/domain"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"net/http"
 )
-
-func GetUserID(ctx context.Context) (uuid.UUID, bool) {
-	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
-	return userID, ok
-}
 
 func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -22,7 +17,7 @@ func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			claims := &services.TokenClaims{}
+			claims := &domain.TokenClaims{}
 
 			token, err := jwt.ParseWithClaims(cookie.Value, claims, func(t *jwt.Token) (interface{}, error) {
 				return []byte(secretKey), nil
@@ -33,7 +28,7 @@ func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+			ctx := context.WithValue(r.Context(), domain.UserIDKey, claims.UserID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
